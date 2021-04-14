@@ -1,3 +1,8 @@
 plots/__pycache__/*
 gifs/gifs.py
 gifs/__pycache__/*
+.env
+BeowulfFullLines.txt
+*.zip
+env/*
+.vscode/*
