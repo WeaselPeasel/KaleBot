@@ -13,16 +13,18 @@ from dotenv import load_dotenv
 import requests
 import pandas
 
+# Allow access to environment variables
+load_dotenv()
+
 # local imports
 import gifs.gifs as g
 import plots.drawplot as myplot
+import db_files.load_db as ldb
 
 ### Begin
 
 client = discord.Client()
 
-# Allow access to environment variables
-load_dotenv()
 # make sure we have the members intent
 discord.Intents.members = True
 # Set the random seed for gender selection
@@ -31,11 +33,11 @@ random.seed()
 # Variables
 PING_ON_START = False
 DEVELOPMENT_MODE = False
+DEBUG_MODE = False
 
 seed = 1
 
 BOT_ADMIN = os.getenv("BOT_ADMIN")
-proposed_gender = ""
 
 color = discord.Color(0).dark_green()
 
@@ -46,6 +48,7 @@ help_dict = {"$hello": "KaleBot says 'Hello!'",
 			 "$mygender": "KaleBot predicts your gender randomly",
 			 "$annoy <user>": "KaleBot pings <user>",
 			 "$new gender <gender>": "Propose a new gender to add to the list",
+			 "$query_gender": "Show what the current proposed gender is",
 			 "$meme": "Sends a random meme that we have on disk",
 			 "$graph": "Attach a .csv file to graph the data contents",
 			 "$graph_help": "Shows the usage for the $graph command"}
@@ -57,11 +60,11 @@ graph_help_dict = {"-graphtype": "The type of graph you want to generate <hist, 
 				   "-headers": "If a row of data in your csv has the headers for the data, put that row number here"}
 
 # gender variables
-genders = ["non-binary", "g0rl", "boi", "femboy", 
-			"awfuckicantbelieveyouvedonethis", "trans", "yes", "no", "sex god", 
-			"Obama", "the Gay Agenda", "somewhere in between", 
-			"you need therapy, not a bot", "robot", "squishmallow", "furry", 
-			"fury", "a _mystery_", "cuck", "cis-het :("]
+# genders = ["non-binary", "g0rl", "boi", "femboy", 
+# 			"awfuckicantbelieveyouvedonethis", "trans", "yes", "no", "sex god", 
+# 			"Obama", "the Gay Agenda", "somewhere in between", 
+# 			"you need therapy, not a bot", "robot", "squishmallow", "furry", 
+# 			"fury", "a _mystery_", "cuck", "cis-het :("]
 
 MAX_GENDER_LENGTH = 50
 MAX_MESSAGE_COUNT = 113
@@ -94,12 +97,19 @@ def get_quote():
 	return(quote)
 
 # randomly select a gender from our array
-def get_gender():
+def get_gender(gid):
 	global message_count
+
+	# get genders from database
+	gender_list = ldb.load_gender_list(gid)
+	if type(gender_list) != list:
+		print(gender_list)
+		return "AN ERROR: SEE CONSOLE FOR OUTPUT"
+
 	rand_num = random.randint(0, 100)
 	seed = rand_num + message_count
-	array_index = seed % len(genders)
-	return genders[array_index]
+	array_index = seed % len(gender_list)
+	return gender_list[array_index][0]
 
 # return a formatted embed to send
 def get_embed(title: str = None, body: str = None, names: list = [], 
@@ -147,13 +157,6 @@ async def on_ready():
 			if channel.name == "the-lab" or channel.name == "kalebot-tomfoolery":
 				await channel.send("KaleBot is in development. Expect interruptions")
 
-	# load genders from file
-	gender_file = open(GENDERS_FILE, "r")
-	gender = gender_file.readline()
-	while gender != "":
-		genders.append(gender)
-		gender = gender_file.readline()
-	gender_file.close()
 	
 @client.event
 async def on_disconnect():
@@ -175,7 +178,6 @@ async def on_message(message):
 	global t2
 	global MAX_MESSAGE_COUNT
 	global message_count
-	global proposed_gender
 	global BOT_ADMIN
 
 	# increment message count for gender selection
@@ -367,52 +369,80 @@ async def on_message(message):
 	### GENDER SECTION
 	# Randomly assign a gender
 	elif message.content.startswith("$mygender"):
-		await message.channel.send(embed=get_embed(body="**<@!{0.id}>'s gender is:** {1}".format(message.author, get_gender())))
+		await message.channel.send(embed=get_embed(body="**<@!{0.id}>'s gender is:** {1}".format(message.author, get_gender(message.guild.id))))
 		
 	# Propose a gender
 	elif message.content.startswith("$new gender"):
 		raw_gender = message.content.split("$new gender")
+		# make sure a gender was actually proposed
+		if len(raw_gender) <= 1:
+			await message.channel.send(embed=get_embed(body="No gender supplied"))
 		gender = (raw_gender[1].strip()).replace("  ", " ")
+
 		if len(gender) > MAX_GENDER_LENGTH:
 			await message.channel.send(embed=get_embed(body="That gender is too long"))
-		elif gender in genders:
-			await message.channel.send(embed=get_embed(body="That gender already exists"))
-		elif proposed_gender == "":
-			proposed_gender = gender
-			# loop through members to get myself
-			member_list = message.guild.fetch_members()
-			uid = -1
-			async for member in member_list:
-				if member.name == BOT_ADMIN or member.display_name == BOT_ADMIN:
-					uid = member.id
-			if uid == -1:
-				# if I'm not here, something's wrong
-				await message.channel.send("Yo we fucked up...")
-			else:
-				await message.channel.send(embed=get_embed(body=
-					"Await approval from <@!{0}>".format(uid)))
 		else:
-			await message.channel.send(embed=get_embed(title="!!!There is already a gender awaiting approval"))
+			gender_exists = ldb.check_if_gender_exists(gender, message.guild.id)
+			if gender_exists == False:
+				err = ldb.suggest_gender(gender, message.guild.id)
+				# print error in discord if there is one
+				if err != None:
+					await message.channel.send(embed=get_embed(title="DEBUG", body=err))
+				# add gender to suggestions and send message
+				await message.channel.send(embed=get_embed(body=
+					"Await approval from an admin"))
+			else:
+				# print("DEBUG:\t", gender_exists)
+				await message.channel.send(embed=get_embed(title="!!!That gender already exists for this server!!!", body=""))
 
-	elif message.content.startswith("$query gender"):
-		await message.channel.send(embed=get_embed(title="The proposed gender is: \n", 
-									body="> {}".format(proposed_gender)))
+	elif message.content.startswith("$query_gender"):
+		proposed_genders = ldb.get_gender_suggestions(message.guild.id)
+		# show first element of the array 
+		err = None
+		gender = '*NO NEW GENDERS*'
+		if len(proposed_genders) > 0:
+			gender = proposed_genders[0][0]
+			err = ldb.insert_gender(gender, message.guild.id)
+		if err != None:
+			await message.channel.send(embed=get_embed(title="DEBUG", body=err))
+		else:
+			await message.channel.send(embed=get_embed(body="`Gender is` {0}".format(gender)))
+		#await message.channel.send(embed=get_embed(title="Feature not Implemented\n", 
+		#body="Someone tell Kale to get to it"))
+		#await message.channel.send(embed=get_embed(title="The proposed gender is: \n", 
+		#							body="> {}".format(proposed_gender)))
 
 	elif message.content.startswith("$approve"):
-		if message.author.name == BOT_ADMIN:
-			genders.append(proposed_gender)
-			# add gender to file
-			gender_file = open(GENDERS_FILE, "a")
-			gender_file.write(proposed_gender)
-			gender_file.close()
-			proposed_gender = ""
+		if message.author.guild_permissions.administrator == True:
+			# Access Gender database
+			proposed_genders = ldb.get_gender_suggestions(message.guild.id)
+			# add first element of the array to genders list
+			err = None
+			gender = ""
+			if len(proposed_genders) > 0:
+				gender = proposed_genders[0][0]
+				err = ldb.insert_gender(gender, message.guild.id)
+			if err != None:
+				await message.channel.send(embed=get_embed(title="DEBUG", body=err))
+			else:
+				ldb.delete_gender_suggestion(gender, message.guild.id)
+			
+
 			await message.channel.send(embed=get_embed(body="`Gender has been approved!`"))
 		else:
 			await message.channel.send(embed=get_embed(body="`Nice try binch >:D`"))
 
 	elif message.content.startswith("$disapprove"):
 		if message.author.name == BOT_ADMIN:
-			proposed_gender = ""
+			proposed_genders = ldb.get_gender_suggestions(message.guild.id)
+			# add first element of the array to genders list
+			err = None
+			if len(proposed_genders) > 0:
+				gender = proposed_genders[0][0]
+				err = ldb.delete_gender_suggestion(gender, message.guild.id)
+			if err != None:
+				await message.channel.send(embed=get_embed(title="DEBUG", body=err))
+
 			await message.channel.send(embed=get_embed(body="`Gender has not been approved :(`"))
 		else:
 			await message.channel.send(embed=get_embed(body="`You are not authorized to complete this action`"))

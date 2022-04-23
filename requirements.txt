@@ -3,3 +3,4 @@ requests
 pandas
 matplotlib
 python-dotenv
+psycopg2

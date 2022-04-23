@@ -6,3 +6,9 @@ BeowulfFullLines.txt
 *.zip
 env/*
 .vscode/*
+cool_api_thing.py
+*.csv
+input_gender_list.txt
+stuff_test.py
+suggestions
+db_files/init_db.sql
