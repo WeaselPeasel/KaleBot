@@ -12,3 +12,4 @@ input_gender_list.txt
 stuff_test.py
 suggestions
 db_files/init_db.sql
+pg_dumpout.sql

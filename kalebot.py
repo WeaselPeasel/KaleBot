@@ -42,6 +42,7 @@ BOT_ADMIN = os.getenv("BOT_ADMIN")
 color = discord.Color(0).dark_green()
 
 help_dict = {"$hello": "KaleBot says 'Hello!'", 
+			 "$patch_notes": "Shows the most recent patch notes for Kalebot",
 			 "$inspire": "KaleBot sends a random quote", 
 			 "$help": "KaleBot sends this help message",
 			 "$give me the launch codes": "KaleBot hands over the launch codes",
@@ -58,6 +59,8 @@ graph_help_dict = {"-graphtype": "The type of graph you want to generate <hist, 
 				   "-ylabel": "The label you wish to have for your y axis (no spaces)",
 				   "-cols": "Which columns do you want graphed? (insert column numbers, starting at 0, separated by commas)",
 				   "-headers": "If a row of data in your csv has the headers for the data, put that row number here"}
+
+CURRENT_VERSION = "2.0"
 
 # gender variables
 # genders = ["non-binary", "g0rl", "boi", "femboy", 
@@ -112,7 +115,7 @@ def get_gender(gid):
 	return gender_list[array_index][0]
 
 # return a formatted embed to send
-def get_embed(title: str = None, body: str = None, names: list = [], 
+def get_embed(title: str = "", body: str = "", names: list = [], 
 			values: list = []):
 	embed_message = discord.Embed(title=title, type="rich", description=body, 
 									colour=color)
@@ -197,6 +200,13 @@ async def on_message(message):
 		# await message.channel.send("Hello!") 
 		await message.channel.send(embed=get_embed(title=None, body="Hello!", 
 													names=[], values=[]))
+
+	if message.content.startswith("$patch_notes"):
+		names = ["**Bugfixes:** ", "**QOL Updates:** ", "**What to look forward to:** "]
+		values = ["`-Fixed issue with genders not saving in proper location. Some may be lost, but we will rebuild!`",
+		"`-Genders are now stored in database, rather than a text file. Better security and performance, may require bugfixes in the future`",
+		"`-Some quality of life updates for the codebase, localizing more variables, and tidying up some messy stuff\n-A way to submit feature requests, so KaleBot can do more for your server :)`"]
+		await message.channel.send(embed=get_embed(title="Patch Notes " + CURRENT_VERSION, names=names, values=values))
 
 	# Send an inspirational quote
 	elif message.content.startswith("$inspire"):
