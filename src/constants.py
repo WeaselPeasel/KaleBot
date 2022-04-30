@@ -62,7 +62,7 @@ CURRENT_VERSION = "2.0"
 MAX_GENDER_LENGTH = 50
 MAX_MESSAGE_COUNT = 113
 message_count = 0
-PROJECT_DIRECTORY = os.environ["PROJECT_DIRECTORY"]
+#PROJECT_DIRECTORY = os.environ["PROJECT_DIRECTORY"]
 FEATURES_FILE = "feature_request_file.txt"
 
 # Plotting Variables

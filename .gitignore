@@ -14,3 +14,6 @@ suggestions
 db_files/init_db.sql
 pg_dumpout.sql
 src/command_strings.json
+kalebotlog.log
+src/__pycache__
+db_files/__pycache__

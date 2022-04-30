@@ -108,23 +108,23 @@ async def on_message(message):
 	if message.content.startswith(command_prefix+patch_note_command):
 		names = ["**Bugfixes:** ", "**QOL Updates:** ", "**What to look forward to:** "]
 		values = ["`-Fixed issue with genders not saving in proper location. Some may be lost, but we will rebuild!`",
-		"`-Genders are now stored in database, rather than a text file. Better security and performance, may require bugfixes in the future`",
+		"`-Genders are now stored in database, rather than a text file. Better security and performance, may require bugfixes in the future\n-Members may now submit feature requests with '{0}{1}' command`".format(command_prefix, feature_request_command),
 		"`-Some quality of life updates for the codebase, localizing more variables, and tidying up some messy stuff\n-A way to submit feature requests, so KaleBot can do more for your server :)`"]
 		await message.channel.send(embed=get_embed(title="Patch Notes " + CURRENT_VERSION, names=names, values=values))
 
 	# Option for making a suggestion
 	if message.content.startswith(command_prefix+feature_request_command):
-		split_message = message.contents.split(command_prefix+feature_request_command, 1)
+		split_message = message.content.split(command_prefix+feature_request_command, 1)
 		try:
 			feature = split_message[1]
 		except IndexError as e:
 			kalebot_logger.error("A user did not provide a feature: " + e)
-			message.channel.send(embed=get_embed(title="ERROR", body="No feature was provided"))
+			await message.channel.send(embed=get_embed(title="ERROR", body="No feature was provided"))
 		else:
-			fp = open(PROJECT_DIRECTORY+FEATURES_FILE, "a")
+			fp = open(FEATURES_FILE, "a")
 			fp.write(feature)
 			fp.close()
-			message.channel.send(embed=get_embed(title="Success", body="Your feature request has been added!"))
+			await message.channel.send(embed=get_embed(title="Success", body="Your feature request has been added!"))
 
 	# Send an inspirational quote
 	elif message.content.startswith(command_prefix+inspire_command):

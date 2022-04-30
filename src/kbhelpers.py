@@ -3,7 +3,7 @@ import requests
 import json
 import random
 import db_files.load_db as ldb
-from constants import color, message_count, LOGGER_NAME
+from .constants import color, message_count, LOGGER_NAME
 import logging
 
 # Helper Functions ---------------------------------------------
