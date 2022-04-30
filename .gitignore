@@ -13,3 +13,4 @@ stuff_test.py
 suggestions
 db_files/init_db.sql
 pg_dumpout.sql
+src/command_strings.json

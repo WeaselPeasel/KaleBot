@@ -1,4 +1,5 @@
 # Native imports
+from operator import le
 import os
 import json
 import random
@@ -6,6 +7,7 @@ import sys
 import time as t
 import queue as qu
 from csv import Sniffer, Error
+import logging
 
 # venv imports
 import discord
@@ -16,10 +18,21 @@ import pandas
 # Allow access to environment variables
 load_dotenv()
 
+# import constants
+from src.constants import *
+
+# initiate logging config
+logging.basicConfig(level=logging.INFO, filename="kalebotlog.log", filemode="w",
+					format="%(asctime)s\t%(levelname)s\t\t%(message)s")
+# create primary logger for whole program
+
+kalebot_logger = logging.getLogger(LOGGER_NAME)
+
 # local imports
 import gifs.gifs as g
 import plots.drawplot as myplot
 import db_files.load_db as ldb
+from src.kbhelpers import *
 
 ### Begin
 
@@ -30,117 +43,7 @@ discord.Intents.members = True
 # Set the random seed for gender selection
 random.seed()
 
-# Variables
-PING_ON_START = False
-DEVELOPMENT_MODE = False
-DEBUG_MODE = False
 
-seed = 1
-
-BOT_ADMIN = os.getenv("BOT_ADMIN")
-
-color = discord.Color(0).dark_green()
-
-help_dict = {"$hello": "KaleBot says 'Hello!'", 
-			 "$patch_notes": "Shows the most recent patch notes for Kalebot",
-			 "$inspire": "KaleBot sends a random quote", 
-			 "$help": "KaleBot sends this help message",
-			 "$give me the launch codes": "KaleBot hands over the launch codes",
-			 "$mygender": "KaleBot predicts your gender randomly",
-			 "$annoy <user>": "KaleBot pings <user>",
-			 "$new gender <gender>": "Propose a new gender to add to the list",
-			 "$query_gender": "Show what the current proposed gender is",
-			 "$meme": "Sends a random meme that we have on disk",
-			 "$graph": "Attach a .csv file to graph the data contents",
-			 "$graph_help": "Shows the usage for the $graph command"}
-
-graph_help_dict = {"-graphtype": "The type of graph you want to generate <hist, bar, scatter, line, box>",
-				   "-xlabel": "The label you wish to have for your x axis (no spaces)",
-				   "-ylabel": "The label you wish to have for your y axis (no spaces)",
-				   "-cols": "Which columns do you want graphed? (insert column numbers, starting at 0, separated by commas)",
-				   "-headers": "If a row of data in your csv has the headers for the data, put that row number here"}
-
-CURRENT_VERSION = "2.0"
-
-# gender variables
-# genders = ["non-binary", "g0rl", "boi", "femboy", 
-# 			"awfuckicantbelieveyouvedonethis", "trans", "yes", "no", "sex god", 
-# 			"Obama", "the Gay Agenda", "somewhere in between", 
-# 			"you need therapy, not a bot", "robot", "squishmallow", "furry", 
-# 			"fury", "a _mystery_", "cuck", "cis-het :("]
-
-MAX_GENDER_LENGTH = 50
-MAX_MESSAGE_COUNT = 113
-message_count = 0
-GENDERS_FILE = "input_gender_list.txt"
-
-# Plotting Variables
-CSV_LOCATIONS = "./plots/files/"
-#OPTION_PREFIX = "-"
-OPTIONS_LIST = ["graphtype", "xlabel", "ylabel", "cols", "headers"]
-
-# meme list
-extensions = [".png", ".jpg"]
-prefixes = ["meme1", "meme2", "meme3"]
-
-# launch code variables
-MINUTES_TO_WIN = 15
-stop_word = False
-launch_code_owner = ""
-t1 = 0
-t2 = 0
-# Helper Functions ---------------------------------------------
-
-# get a quote from zenquotes
-def get_quote():
-	# send a request for some data
-	response = requests.get("https://zenquotes.io/api/random")
-	json_data = json.loads(response.text)
-	quote = json_data[0]['q'] + " -" + json_data[0]['a']
-	return(quote)
-
-# randomly select a gender from our array
-def get_gender(gid):
-	global message_count
-
-	# get genders from database
-	gender_list = ldb.load_gender_list(gid)
-	if type(gender_list) != list:
-		print(gender_list)
-		return "AN ERROR: SEE CONSOLE FOR OUTPUT"
-
-	rand_num = random.randint(0, 100)
-	seed = rand_num + message_count
-	array_index = seed % len(gender_list)
-	return gender_list[array_index][0]
-
-# return a formatted embed to send
-def get_embed(title: str = "", body: str = "", names: list = [], 
-			values: list = []):
-	embed_message = discord.Embed(title=title, type="rich", description=body, 
-									colour=color)
-	count = 0
-	for string in names:
-		embed_message.add_field(name=string, value=values[count], 
-		inline=True)
-		count += 1
-	return embed_message
-
-# randomly pick a meme from our meme folder on disk
-def get_meme_from_disk():
-	global seed
-	global message_count
-	global extensions
-	global prefixes
-	a = 7
-	c = message_count
-	seed = (a*seed + c) % len(prefixes)
-	prefix = prefixes[seed]
-	seed = (a*seed + c) % len(extensions)
-	extension = extensions[seed]
-	directory = "./memes/"
-	filepath = directory + prefix + extension
-	return filepath
 
 
 # Discord Functions --------------------------------------------
@@ -148,6 +51,7 @@ def get_meme_from_disk():
 async def on_ready():
 	# triggers when KaleBot connects to servers
 	print("We have logged in as user {0.user}".format(client))
+	kalebot_logger.info("We have logged in as user {0.user}".format(client))
 	if PING_ON_START == True:
 		text_channel_list = client.get_all_channels()
 		for channel in text_channel_list:
@@ -196,12 +100,12 @@ async def on_message(message):
 
 	### RANDOM JARGON
 	# KaleBot says hello
-	if message.content.startswith("$hello"):
+	if message.content.startswith(command_prefix+hello_command):
 		# await message.channel.send("Hello!") 
 		await message.channel.send(embed=get_embed(title=None, body="Hello!", 
 													names=[], values=[]))
 
-	if message.content.startswith("$patch_notes"):
+	if message.content.startswith(command_prefix+patch_note_command):
 		names = ["**Bugfixes:** ", "**QOL Updates:** ", "**What to look forward to:** "]
 		values = ["`-Fixed issue with genders not saving in proper location. Some may be lost, but we will rebuild!`",
 		"`-Genders are now stored in database, rather than a text file. Better security and performance, may require bugfixes in the future`",
@@ -209,12 +113,12 @@ async def on_message(message):
 		await message.channel.send(embed=get_embed(title="Patch Notes " + CURRENT_VERSION, names=names, values=values))
 
 	# Send an inspirational quote
-	elif message.content.startswith("$inspire"):
+	elif message.content.startswith(command_prefix+inspire_command):
 		quote = get_quote()
 		await message.channel.send(embed=get_embed(title=None, body=quote))
 
 	# print out a help message
-	elif message.content.startswith("$help"):
+	elif message.content.startswith(command_prefix+help_command):
 		names = []
 		values = []
 		for key in help_dict:
@@ -224,7 +128,7 @@ async def on_message(message):
 												values=values))
 
 	# get graph help
-	elif message.content.startswith("$graphhelp") or message.content.startswith("$graph_help"):
+	elif message.content.startswith(command_prefix+graph_help_command):
 		names = []
 		values = []
 		for key in graph_help_dict:
@@ -234,7 +138,7 @@ async def on_message(message):
 											values=values))
 
 	# tag a user
-	elif message.content.startswith("$annoy"):
+	elif message.content.startswith(command_prefix+annoy_command):
 		get_name = message.content.split("$annoy ")
 		name = get_name[1]
 
@@ -252,7 +156,7 @@ async def on_message(message):
 			await message.channel.send(embed=get_embed(body="Sup, <@!{0}>".format(uid)))
 
 	# Post a random meme
-	elif message.content.startswith("$meme"):
+	elif message.content.startswith(command_prefix+meme_command):
 		# get meme
 		file_path = get_meme_from_disk()
 		Dfile = discord.File(file_path, filename="meme.png")
@@ -261,7 +165,7 @@ async def on_message(message):
 		await message.channel.send(file=Dfile, embed=embed)
 
 	# Get a data graph
-	elif message.content.startswith("$graph"):
+	elif message.content.startswith(command_prefix+graph_command):
 		# check for message attachments
 		if message.attachments:
 			# get first attachment and download file
@@ -297,7 +201,7 @@ async def on_message(message):
 			ylabel = None
 			cols = None
 			headers = None
-			substring = message.content.split("$graph ")
+			substring = message.content.split(command_prefix+graph_command+" ")
 			args = substring[1].split("-")
 			for arg in args:
 				cmd = arg.split(" ")
@@ -346,7 +250,7 @@ async def on_message(message):
 
 	### LAUNCH CODE GAME
 	# Play the launch code game
-	elif message.content == "$give me the launch codes":
+	elif message.content == command_prefix+launch_code_command:
 		if launch_code_owner != "":
 			await message.channel.send(embed=get_embed(title=None, body="Sorry, "
 								"but {0} has the launch codes already!!".format(launch_code_owner)))
@@ -359,7 +263,7 @@ async def on_message(message):
 		t1 = t.time()
 
 	# stop the launch code game
-	elif message.content.startswith("$stop!"):
+	elif message.content.startswith(command_prefix+launch_code_stop_command):
 		t2 = t.time()
 		if launch_code_owner == "":
 			await message.channel.send(embed=get_embed(body="No one has the launch codes..."))
@@ -378,12 +282,12 @@ async def on_message(message):
 
 	### GENDER SECTION
 	# Randomly assign a gender
-	elif message.content.startswith("$mygender"):
+	elif message.content.startswith(command_prefix+gender_command):
 		await message.channel.send(embed=get_embed(body="**<@!{0.id}>'s gender is:** {1}".format(message.author, get_gender(message.guild.id))))
 		
 	# Propose a gender
-	elif message.content.startswith("$new gender"):
-		raw_gender = message.content.split("$new gender")
+	elif message.content.startswith(command_prefix+new_gender_command):
+		raw_gender = message.content.split(command_prefix+new_gender_command)
 		# make sure a gender was actually proposed
 		if len(raw_gender) <= 1:
 			await message.channel.send(embed=get_embed(body="No gender supplied"))
@@ -397,7 +301,8 @@ async def on_message(message):
 				err = ldb.suggest_gender(gender, message.guild.id)
 				# print error in discord if there is one
 				if err != None:
-					await message.channel.send(embed=get_embed(title="DEBUG", body=err))
+					kalebot_logger.error(err)
+					#await message.channel.send(embed=get_embed(title="DEBUG", body=err))
 				# add gender to suggestions and send message
 				await message.channel.send(embed=get_embed(body=
 					"Await approval from an admin"))
@@ -405,7 +310,7 @@ async def on_message(message):
 				# print("DEBUG:\t", gender_exists)
 				await message.channel.send(embed=get_embed(title="!!!That gender already exists for this server!!!", body=""))
 
-	elif message.content.startswith("$query_gender"):
+	elif message.content.startswith(command_prefix+query_gender_command):
 		proposed_genders = ldb.get_gender_suggestions(message.guild.id)
 		# show first element of the array 
 		err = None
@@ -414,7 +319,8 @@ async def on_message(message):
 			gender = proposed_genders[0][0]
 			err = ldb.insert_gender(gender, message.guild.id)
 		if err != None:
-			await message.channel.send(embed=get_embed(title="DEBUG", body=err))
+			kalebot_logger.error(err)
+			#await message.channel.send(embed=get_embed(title="DEBUG", body=err))
 		else:
 			await message.channel.send(embed=get_embed(body="`Gender is` {0}".format(gender)))
 		#await message.channel.send(embed=get_embed(title="Feature not Implemented\n", 
@@ -422,7 +328,7 @@ async def on_message(message):
 		#await message.channel.send(embed=get_embed(title="The proposed gender is: \n", 
 		#							body="> {}".format(proposed_gender)))
 
-	elif message.content.startswith("$approve"):
+	elif message.content.startswith(command_prefix+approve_gender_command):
 		if message.author.guild_permissions.administrator == True:
 			# Access Gender database
 			proposed_genders = ldb.get_gender_suggestions(message.guild.id)
@@ -442,7 +348,7 @@ async def on_message(message):
 		else:
 			await message.channel.send(embed=get_embed(body="`Nice try binch >:D`"))
 
-	elif message.content.startswith("$disapprove"):
+	elif message.content.startswith(command_prefix+disapprove_gender_command):
 		if message.author.name == BOT_ADMIN:
 			proposed_genders = ldb.get_gender_suggestions(message.guild.id)
 			# add first element of the array to genders list

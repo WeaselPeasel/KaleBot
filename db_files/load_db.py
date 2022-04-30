@@ -1,12 +1,17 @@
 # Defines the interface for interacting with our database
 import psycopg2 as pg
 import os
+import logging
+from src.constants import LOGGER_NAME
 
 # set db connection variables
 db_host = os.environ['DB_HOST']
 db_name = os.environ['DB_NAME']
 db_user = os.environ['DB_USER']
 db_pword = os.environ['DB_PWORD']
+
+kalebot_logger = logging.getLogger(LOGGER_NAME)
+
 def get_db():
 	conn = pg.connect(host=db_host, database=db_name, user=db_user, password=db_pword)
 	return conn
@@ -76,15 +81,12 @@ def check_if_gender_exists(gender, gid) -> bool:
 		return str(e)
 	result = cur.fetchall()
 	if len(result) > 0:
-		# print(result)
-		# print("WARNING:\tSugested gender found in gender_table")
+		kalebot_logger.info(f"Suggested gender '{gender}' was found in the gender table")
 		gender_exists = True
 
 	query = """SELECT gender_suggestion FROM gender_inputs 
 	WHERE gender_suggestion = %s 
 	AND gid = %s;"""
-	conn = get_db()
-	cur = conn.cursor()
 	try:
 		cur.execute(query, (str(gender), str(gid)))
 	except pg.DatabaseError as e:
@@ -93,7 +95,7 @@ def check_if_gender_exists(gender, gid) -> bool:
 		return str(e)
 	if len(cur.fetchall()) > 0:
 		gender_exists = True
-		# print("WARNING:\tSugested gender found in gender_suggestions")
+		kalebot_logger.info(f"Suggested gender '{gender}' was found in the gender suggestions")
 	conn.close()
 	return gender_exists
 
