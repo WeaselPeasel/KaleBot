@@ -3,11 +3,14 @@ import discord
 import os
 import json
 
+from matplotlib.pyplot import new_figure_manager
+
 # define command prefix and names here
 command_prefix = "$"
 help_command = "help"
 hello_command = "hello"
 patch_note_command = "patch_notes"
+feature_request_command = "new_feature"
 inspire_command = "inspire"
 graph_command = "graph"
 graph_help_command = "graph_help"
@@ -37,6 +40,7 @@ help_dict = {command_prefix + hello_command: "KaleBot says 'Hello!'",
 			 command_prefix + patch_note_command: "Shows the most recent patch notes for Kalebot",
 			 command_prefix + inspire_command: "KaleBot sends a random quote", 
 			 command_prefix + help_command: "KaleBot sends this help message",
+			 command_prefix + feature_request_command + "<new_feature>": "Put in a feature request",
 			 command_prefix + launch_code_command: "KaleBot hands over the launch codes",
 			 command_prefix + gender_command: "KaleBot predicts your gender randomly",
 			 command_prefix + annoy_command + " <user>": "KaleBot pings <user>",
@@ -58,7 +62,8 @@ CURRENT_VERSION = "2.0"
 MAX_GENDER_LENGTH = 50
 MAX_MESSAGE_COUNT = 113
 message_count = 0
-GENDERS_FILE = "input_gender_list.txt"
+PROJECT_DIRECTORY = os.environ["PROJECT_DIRECTORY"]
+FEATURES_FILE = "feature_request_file.txt"
 
 # Plotting Variables
 CSV_LOCATIONS = "./plots/files/"
